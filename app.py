@@ -1,3 +1,4 @@
+from datetime import timedelta
 import os
 import pymongo
 import pandas as pd
@@ -24,29 +25,42 @@ db_client = db_client.get_database(PRODUCTION_DB_NAME)
 
 merchant_details = pd.DataFrame(list(db_client.merchants_details.find({}, {'_id': 0})))
 merchant_details = merchant_details.rename(columns={'phone_number': 'merchant_phone_number'})
-restuarant_names = list(merchant_details["restaurant_name"].unique())
-restaurant_name = st.selectbox("Select restaurant", options=restuarant_names)
+
+restuarant_names_list = list(merchant_details["restaurant_name"].unique())
+restaurant_name = st.multiselect("Select restaurant", options=restuarant_names_list)
+if len(restaurant_name) == 0:
+    restaurant_name = restuarant_names_list
 
 orders = pd.DataFrame(list(db_client.orders.find({}, {'_id': 0})))
 orders = orders.rename(columns={'created_on': 'order_created_on'})
-pp(orders.columns)
+
+payment_status_list = list(orders["payment_status"].unique())
+payment_status = st.multiselect("Select payment status", options=payment_status_list)
+if len(payment_status) == 0:
+    payment_status = payment_status_list
+
 
 required_columns = [
-    "restaurant_name", "merchant_phone_number",
+    "restaurant_name",
     "customer_name", "order_id", "order_created_on", 
     "order_type", "table_number", "order_created_by",
-    "amount_after_taxes", "order_status"
-]
+    "amount", "amount_after_taxes", "order_status",
+    "payment_status"
+    ]
 orders = orders.merge(merchant_details, on='merchant_id', how='left')
 customer_details = pd.DataFrame(list(db_client.customer_details.find({}, {'_id': 0})))
 customer_details = customer_details.rename(columns={'user_name': 'customer_name'})
-pp(customer_details.columns)
 orders = orders.merge(customer_details, on='customer_id', how='left')
-restaurant_orders = orders[orders["restaurant_name"]==restaurant_name][required_columns]
+restaurant_orders = orders[
+    (orders["restaurant_name"].isin(restaurant_name)) &
+    (orders["payment_status"].isin(payment_status))
+    ][required_columns]
 restaurant_orders["table_number"] = restaurant_orders["table_number"].fillna("NA")
-st.write(restaurant_orders)
+restaurant_orders["order_created_on"] = pd.to_datetime(restaurant_orders["order_created_on"].apply(lambda x: x+timedelta(hours=5, minutes=30)))
 
-total_order_amount = restaurant_orders["amount_after_taxes"].sum()
+st.dataframe(restaurant_orders)
+
+total_order_amount = round(restaurant_orders["amount_after_taxes"].sum(), 2)
 total_dine_order_amount = restaurant_orders[restaurant_orders["order_type"]=="Dine-in"]["amount_after_taxes"].sum()
 total_takeaway_order_amount = restaurant_orders[restaurant_orders["order_type"]=="Take away"]["amount_after_taxes"].sum()
 total_delivery_order_amount = restaurant_orders[restaurant_orders["order_type"]=="Delivery"]["amount_after_taxes"].sum()
