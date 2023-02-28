@@ -1,0 +1,4 @@
+pyarrow==5.0.0
+streamlit==1.14.0
+pymongo[srv]==3.11.0
+icecream==2.1.3
