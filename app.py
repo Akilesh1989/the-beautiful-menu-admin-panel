@@ -31,8 +31,11 @@ restaurant_name = st.multiselect("Select restaurant", options=restuarant_names_l
 if len(restaurant_name) == 0:
     restaurant_name = restuarant_names_list
 
+
 orders = pd.DataFrame(list(db_client.orders.find({}, {'_id': 0})))
 orders = orders.rename(columns={'created_on': 'order_created_on'})
+orders = orders.rename(columns={'created_on': 'order_created_on'})
+orders["payment_made_through_payment_gateway"] =  orders["payment_made_through_payment_gateway"].apply(lambda x: "Yes" if x==True else "No")
 
 payment_status_list = list(orders["payment_status"].unique())
 payment_status = st.multiselect("Select payment status", options=payment_status_list)
@@ -45,7 +48,7 @@ required_columns = [
     "customer_name", "order_id", "order_created_on", 
     "order_type", "table_number", "order_created_by",
     "amount", "amount_after_taxes", "order_status",
-    "payment_status"
+    "payment_status", "payment_made_through_payment_gateway"
     ]
 orders = orders.merge(merchant_details, on='merchant_id', how='left')
 customer_details = pd.DataFrame(list(db_client.customer_details.find({}, {'_id': 0})))
@@ -62,10 +65,15 @@ st.dataframe(restaurant_orders)
 
 total_order_amount = round(restaurant_orders["amount_after_taxes"].sum(), 2)
 total_dine_order_amount = restaurant_orders[restaurant_orders["order_type"]=="Dine-in"]["amount_after_taxes"].sum()
+total_dine_paid_order_amount = restaurant_orders[(restaurant_orders["order_type"]=="Dine-in") & (restaurant_orders["payment_status"]=="paid")]["amount_after_taxes"].sum()
+total_dine_unpaid_order_amount = restaurant_orders[(restaurant_orders["order_type"]=="Dine-in") & (restaurant_orders["payment_status"]=="un-paid")]["amount_after_taxes"].sum()
 total_takeaway_order_amount = restaurant_orders[restaurant_orders["order_type"]=="Take away"]["amount_after_taxes"].sum()
 total_delivery_order_amount = restaurant_orders[restaurant_orders["order_type"]=="Delivery"]["amount_after_taxes"].sum()
 
+st.write(f"Total orders: {restaurant_orders.shape[0]}")
 st.write(f"Total order amount: {total_order_amount}")
 st.write(f"Total dine in order amount: {total_dine_order_amount}")
+st.write(f"Total dine in paid order amount: {total_dine_paid_order_amount}")
+st.write(f"Total dine in unpaid order amount: {total_dine_unpaid_order_amount}")
 st.write(f"Total takeaway order amount: {total_takeaway_order_amount}")
 st.write(f"Total delivery order amount: {total_delivery_order_amount}")
